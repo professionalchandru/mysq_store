@@ -25,8 +25,6 @@ const app                              = express();
 /**
  * MySQL connection
  */
-const {connection}                     = require('./config')
-
 const {con}                            = require('./db_config')
 
 /**

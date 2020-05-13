@@ -1,4 +1,4 @@
-const mysql = require('mysql');
+const mysql                             = require('mysql');
 
 /**
  * MySQL connection establishment with database
@@ -22,52 +22,8 @@ let con = mysql.createConnection({
 
     if(err) throw err;
 
-    console.log('connected from db_config.js');
+    console.log('connected to MYSQL DB');
 
   })
-
-  /**
-   * End point for create Products table
-   */
-  exports.productsTable = con.query(`CREATE TABLE IF NOT EXISTS Products(
-
-    id int primary key auto_increment,
-
-    name varchar(255) not null,
-
-    category varchar(255) not null,
-
-    price int not null,
-
-    quantity int not null,
-
-    description text,
-
-    likedBy text
-
-  )`,(err,result,filed)=>{
-
-    if(err) throw err;
-
-  })
-
-  /**
-   * End point for create User table
-   */
-  exports.usersTable = con.query(`CREATE TABLE IF NOT EXISTS Users(
-
-    id int primary key auto_increment,
-
-    name varchar(255) not null,
-
-    email varchar(255) not null,
-
-    password text not null
-
-  )`,(err, result, filed)=>{
-
-    if(err) throw err;
-
-  });
 
   module.exports.con= con;

@@ -1,26 +1,28 @@
-const {con}                             = require('../db_config');
+const { con }                           = require("../db_config");
 
-const router                            = require('express').Router();
+const router                            = require("express").Router();
 
-const bcrypt                            = require('bcryptjs');
+const bcrypt                            = require("bcryptjs");
 
-const jwt                               = require('jsonwebtoken')
+const jwt                               = require("jsonwebtoken");
 
 //Import user model
-const { userModelInstance } = require('../models/usermodel');
+const { userModelInstance }             = require("../models/usermodel");
+
+const userInstance                      = userModelInstance();
 
 //Import Joi Validation
-const { User } = require('../validation');
+const { User }                          = require("../validation");
 
 /**
  * Register user view engine user interface call
  * @async
  */
-router.get('/register', async (req, res, next) => {
+router.get("/register", async (req, res, next) => {
 
-  res.render('register');
+  res.render("register");
 
-})
+});
 
 /**
  * create new user for access our application
@@ -28,7 +30,7 @@ router.get('/register', async (req, res, next) => {
  * @returns {object} created user
  * @param {object} userDetails name, email, password
  */
-router.post('/register', async (req, res) => {
+router.post("/register", async (req, res) => {
 
   //Validation applied here
   const validate = User.register(req.body);
@@ -38,9 +40,9 @@ router.post('/register', async (req, res) => {
     try {
 
       //Generate hash password
-      const salt = await bcrypt.genSalt(12)
+      const salt = await bcrypt.genSalt(12);
 
-      const hashPassword = await bcrypt.hash(req.body.password, salt)
+      const hashPassword = await bcrypt.hash(req.body.password, salt);
 
       const userData = {
 
@@ -52,41 +54,48 @@ router.post('/register', async (req, res) => {
 
       };
 
+      let email = req.body.email;
+
       //Check existing user
-      let sql = `SELECT email FROM users where email = '${req.body.email}'`
 
-      const userExist = await con.query(sql,(err,result)=>{
+      await userInstance.searchUser(userData, (err, result) => {
 
-        if(err) throw err
+        if (err) throw err;
 
-        if(result.length>0)
-        {
+        if (result[0].length > 0) {
 
-          return res.status(400).render('register', { error: req.body.email + ' is already exist' });
+          return res.status(400).render("register", {
 
+            error: req.body.email + " is already exist"
+
+          });
+
+        } else {
+
+          userInstance.createUser(userData, (err, result) => {
+
+            if (err) throw err;
+
+            res.status(200).render("register", {
+
+              success: userData.email + " is added sucessfully",
+
+            });
+          });
         }
-
-        else{
-
-          const newUser = userInstance.createUser(userData);
-
-          res.status(200).render('register', { success: userData.email + ' is added sucessfully' })
-        }
-      })
-
+      });
 
     } catch (err) {
 
       if (err) {
 
-        res.status(400).render('register', { error: err })
+        res.status(400).render("register", { error: err });
 
       }
     }
-
   } else {
 
-    res.status(400).render('register', { error: validate.error.message });
+    res.status(400).render("register", { error: validate.error.message });
 
   }
 });
@@ -97,70 +106,75 @@ router.post('/register', async (req, res) => {
  * @param {object} userDetails
  * @async
  */
-router.post('/login', async (req, res) => {
+router.post("/login", async (req, res) => {
 
   //Joi validation for user inputs
   const validate = User.login(req.body);
 
   if (validate.error == null) {
 
-  //Check existing user
-  let sql = `SELECT * FROM users where email = '${req.body.email}'`
+    try {
 
-  const user = await con.query(sql,async(err,result)=>{
+      const userEmail = {
 
-    if(err) throw err
+        email: req.body.email
 
-    if(result.length<1)
-    {
+      };
 
-      return res.status(400).render('login', { error: req.body.email + " doesn't exist" });
+      await userInstance.searchUser(userEmail, async (err, result) => {
+
+        if (err) throw err;
+
+        if (result[0].length < 1) {
+
+          return res.status(400).render("login", { error: req.body.email + " doesn't exist" });
+
+        }
+
+        const userData = {
+
+          id: result[0][0].id,
+
+          email: result[0][0].email,
+
+          existingPassword: result[0][0].password,
+
+          password: req.body.password
+
+        };
+
+        //Verify password
+        let passchekc = await userInstance.verifyUser(userData);
+
+        if (!passchekc) {
+
+          return res.render("login", { error: "Invalid Password" });
+
+        } else {
+
+          let token = await userInstance.tokenGenerator(userData);
+
+          res.cookie("token", token, { maxAge: 3600 * 1000 });
+
+          res.redirect("/api/products/search");
+
+          res.end();
+
+        }
+      });
+
+    } catch (err) {
+
+      if (err) throw err;
 
     }
-
-    const userData ={
-
-      id: result[0].id,
-
-      email: result[0].email,
-
-      existingPassword : result[0].password,
-
-      password : req.body.password
-
-    }
-
-    //Verify password
-    const passCheck = await bcrypt.compare(userData.password, userData.existingPassword)
-
-    console.log(passCheck)
-
-    if (!passCheck) {
-
-      return res.render('login', { error: "Invalid Password" });
-
-    }else{
-
-    const token = await jwt.sign({ id: userData.id, email: userData.email }, process.env.TOKEN_SECRET, { expiresIn: '5h' });
-
-    res.cookie('token', token, { maxAge: 3600 * 1000 });
-
-    res.redirect('/api/products/search');
-
-    res.end()
-
-    }
-
-  })
-
   } else {
 
-    console.log(validate.error.message)
+    console.log(validate.error.message);
 
-    res.status(400).render('login', { error: validate.error.message });
+    res.status(400).render("login", { error: validate.error.message });
 
   }
-
 });
 
 module.exports = router;
